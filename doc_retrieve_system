@@ -1,0 +1,90 @@
+Option Explicit
+
+Public Sub loopfolder()
+
+Dim m As Integer
+Dim mypath As String
+Dim myfile As String
+
+Dim r As Integer
+
+mypath = ActiveWorkbook.Path & "\"
+
+myfile = Dir(mypath & "*.txt")
+
+r = 1
+
+Do While myfile <> ""
+    m = m + 1
+    Call loopfile(myfile, r)
+    myfile = Dir()
+    
+Loop
+
+'Debug.Print m
+
+
+End Sub
+
+Sub loopfile(mytextfile As String, r As Integer)
+
+Dim myBuf As String
+Dim myFNo As Integer
+Dim myary() As String
+Dim i As Integer, cnt As Integer
+
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+
+myFNo = FreeFile
+
+Open mytextfile For Input As #myFNo
+
+Do Until EOF(myFNo)
+
+    Line Input #myFNo, myBuf
+    myary = Split(myBuf, " ")
+    
+    For i = 0 To UBound(myary) - 1
+    
+    regex.Pattern = "[^A-Za-z0-9\ ]"
+    regex.IgnoreCase = True
+    regex.Global = True
+    myary(i) = regex.Replace(myary(i), " ")
+    
+    Cells(r, 1).Value = myary(i)
+    Cells(r, 2).Value = mytextfile
+    
+    r = r + 1
+    Next i
+    
+    'Debug.Print r
+Loop
+Close #myFNo
+
+End Sub
+
+
+Private Sub IndexCollection()
+    ReDim mCitonary(1, 0) As Variant
+    ReDim mPostings(2, 0) As Variant
+    
+    ActiveSheet.Cells.Clear
+End Sub
+
+
+Private Sub UpdatePostingsAndDict()
+Dim PostIndex As Integer
+Dim PostFound As Boolean: PostFound = True
+For PostIndex = 0 To UBound(mPostings, 2)
+    If Token = mPostings(0, PostIndex) And Filename = mPostings(1, PostIndex) Then
+        PostFound = True
+        mPostings(2, PostIndex) = mPostings(2, PostIndex) + 1
+        Exit For
+    End If
+Next
+
+If Not PostFound Then
+
+End Sub
+
