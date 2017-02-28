@@ -1,90 +1,470 @@
 Option Explicit
 
-Public Sub loopfolder()
+Dim mPostings() As Variant
+Dim mDictionary() As Variant
 
-Dim m As Integer
-Dim mypath As String
-Dim myfile As String
+Public Sub Part1()
 
-Dim r As Integer
+ReDim mPostings(2, 0) As Variant
+ReDim mDictionary(1, 0) As Variant
 
-mypath = ActiveWorkbook.Path & "\"
 
-myfile = Dir(mypath & "*.txt")
+Dim PEnd As Integer: PEnd = UBound(mPostings, 2)
+Dim DEnd As Integer: DEnd = UBound(mDictionary, 2)
 
-r = 1
-
-Do While myfile <> ""
-    m = m + 1
-    Call loopfile(myfile, r)
-    myfile = Dir()
+'Create an array of all files and store them one by one
+ 
+    Dim myFolder As String: myFolder = "C:\Users\admin\Desktop\Final Project Collection\"
+    Dim myFileName As String: myFileName = Dir(myFolder)
+    Dim ArrayForFile() As Variant
+    Dim TotalFile As Integer
     
-Loop
-
-'Debug.Print m
-
-
-End Sub
-
-Sub loopfile(mytextfile As String, r As Integer)
-
-Dim myBuf As String
-Dim myFNo As Integer
-Dim myary() As String
-Dim i As Integer, cnt As Integer
-
-Dim regex As Object
-Set regex = CreateObject("VBScript.RegExp")
-
-myFNo = FreeFile
-
-Open mytextfile For Input As #myFNo
-
-Do Until EOF(myFNo)
-
-    Line Input #myFNo, myBuf
-    myary = Split(myBuf, " ")
+    Do While myFileName <> ""
+        ReDim Preserve ArrayForFile(TotalFile)
+        ArrayForFile(TotalFile) = myFileName
+        'Debug.Print ArrayForFile(TotalFile)
+        TotalFile = TotalFile + 1
+        myFileName = Dir
+    Loop
     
-    For i = 0 To UBound(myary) - 1
     
-    regex.Pattern = "[^A-Za-z0-9\ ]"
-    regex.IgnoreCase = True
-    regex.Global = True
-    myary(i) = regex.Replace(myary(i), " ")
     
-    Cells(r, 1).Value = myary(i)
-    Cells(r, 2).Value = mytextfile
+'Loop through each word in each file line by line to make postings and dictionary
+    Dim FileCounter As Integer: FileCounter = 0
+    Dim data As String
     
-    r = r + 1
+'Open each file in the array
+    For FileCounter = LBound(ArrayForFile) To UBound(ArrayForFile)
+    
+        Open ArrayForFile(FileCounter) For Input As #1
+        
+            Do Until EOF(1)
+            Line Input #1, data
+                
+                Dim wordAry() As String
+                    wordAry = Split(data, " ")
+                
+                Dim i As Integer
+                For i = LBound(wordAry) To UBound(wordAry)
+                    wordAry(i) = UCase(wordAry(i))
+                    Dim Token As String
+                    Token = wordAry(i)
+                    Token = CleanUp(Token)
+                    'Debug.Print Token
+                    
+'Create postings
+
+                    Dim PostIndex As Integer
+                    Dim PostFound As Boolean: PostFound = False
+                    Dim itsFileName As String: itsFileName = Dir(ArrayForFile(FileCounter))
+                    
+                    For PostIndex = 0 To PEnd
+                        If Token = mPostings(0, PostIndex) And itsFileName = mPostings(1, PostIndex) Then
+                            PostFound = True
+                            mPostings(2, PostIndex) = mPostings(2, PostIndex) + 1
+                            Exit For
+                        End If
+                    Next PostIndex
+                        
+                        If Not PostFound Then
+                            ReDim Preserve mPostings(2, PEnd + 1) As Variant
+                            mPostings(0, PEnd + 1) = Token
+                            mPostings(1, PEnd + 1) = itsFileName
+                            mPostings(2, PEnd + 1) = 1
+                            PEnd = UBound(mPostings, 2)
+'Create Dicitonary
+                        
+                            Dim DictFound As Boolean: DictFound = False
+                            Dim DictIndex As Integer
+                            For DictIndex = 0 To DEnd
+                                If Token = mDictionary(0, DictIndex) Then
+                                    DictFound = True
+                                    mDictionary(1, DictIndex) = mDictionary(1, DictIndex) + 1
+                                    Exit For
+                                End If
+                            Next DictIndex
+                                
+                                If Not DictFound Then
+                                    ReDim Preserve mDictionary(1, DEnd + 1) As Variant
+                                    mDictionary(0, DEnd + 1) = Token
+                                    mDictionary(1, DEnd + 1) = 1
+                                    DEnd = UBound(mDictionary, 2)
+                                End If
+                            End If
+                    Next i
+                
+            Loop
+        Close #1
+    Next FileCounter
+
+'Normalize tf after creating postings
+    Dim LastFile As String
+    LastFile = mPostings(1, 1)
+    Dim SumSquares As Long
+    For i = 1 To PEnd
+        If LastFile = mPostings(1, i) Then
+            SumSquares = SumSquares + WorksheetFunction.Power(mPostings(2, i), 2)
+        Else
+            Call NormFileTFs(LastFile, i - 1, SumSquares)
+            SumSquares = WorksheetFunction.Power(mPostings(2, i), 2)
+        End If
+        LastFile = mPostings(1, i)
     Next i
     
-    'Debug.Print r
-Loop
-Close #myFNo
+    Call NormFileTFs(LastFile, UBound(mPostings, 2), SumSquares)
 
-End Sub
+'Store normalized tf value into mPostings array
 
-
-Private Sub IndexCollection()
-    ReDim mCitonary(1, 0) As Variant
-    ReDim mPostings(2, 0) As Variant
+    For i = 1 To PEnd
+        mPostings(2, i) = Log(TotalFile / mPostings(2, i))
+    Next i
+    Call Bubblesort_post(mPostings) 'sort tf value with acsending order : the bigger the tf value, the tf-idf value will be larger
     
-    ActiveSheet.Cells.Clear
+'Normalize df with M/df (become idf) after creating dictionary , M = TotalFile
+    Dim idf As Integer
+    For DictIndex = 1 To DEnd
+        idf = Log(TotalFile / mDictionary(1, DictIndex))
+        mDictionary(1, DictIndex) = idf
+    Next DictIndex
+
+    Call Bubblesort_dict(mDictionary)
+
+
+'Print postings and dictionary
+    Application.ScreenUpdating = False
+    For PostIndex = 1 To PEnd
+        Worksheets("Postings").Cells(1, 1).Offset(PostIndex - 1, 0) = mPostings(0, PostIndex)
+        Worksheets("Postings").Cells(1, 2).Offset(PostIndex - 1, 0) = mPostings(1, PostIndex)
+        Worksheets("Postings").Cells(1, 3).Offset(PostIndex - 1, 0) = mPostings(2, PostIndex)
+    Next PostIndex
+    
+    For DictIndex = 1 To DEnd
+        Worksheets("Dictionary").Cells(1, 1).Offset(DictIndex - 1, 0) = mDictionary(0, DictIndex)
+        Worksheets("Dictionary").Cells(1, 2).Offset(DictIndex - 1, 0) = mDictionary(1, DictIndex)
+    Next DictIndex
+    Application.ScreenUpdating = True
+    
+    Call Part2
+
+End Sub
+    
+Public Sub NormFileTFs(FileName As String, FileLastSlot As Integer, SumSquares As Long)
+
+Dim hypo As Double: hypo = Sqr(SumSquares)
+    Dim j As Integer: j = FileLastSlot
+    Do While mPostings(1, j) = FileName
+        mPostings(2, j) = mPostings(2, j) / hypo
+        j = j - 1
+    Loop
+
 End Sub
 
+Public Sub Bubblesort_dict(sortary As Variant)
 
-Private Sub UpdatePostingsAndDict()
+  Dim temp1 As String
+  Dim temp2 As String
+  Dim i As Long
+  Dim j As Long
+  Dim First As Long
+  Dim Last As Long
+  First = LBound(sortary, 2)
+  Last = UBound(sortary, 2)
+  
+  For i = First To Last - 1
+    For j = i + 1 To Last
+    
+      If sortary(0, i) > sortary(0, j) Then
+        temp1 = sortary(0, i)
+        temp2 = sortary(1, i)
+        
+        
+        sortary(0, i) = sortary(0, j)
+        sortary(1, i) = sortary(1, j)
+        
+        sortary(0, j) = temp1
+        sortary(1, j) = temp2
+      End If
+    Next j
+  Next i
+
+End Sub
+
+ 
+
+Function CleanUp(text As String) As String
+Dim regex As Object
+Set regex = CreateObject("VBScript.RegExp")
+With CreateObject("VBScript.RegExp")
+.Pattern = "[^A-Za-z0-9\ ]"
+.IgnoreCase = True
+.Global = True
+CleanUp = .Replace(text, "")
+
+End With
+End Function
+
+'Part 2
+'Please go to Worksheets("Query")
+'I am trying my best to finish part 2, but I do not have enough time to figure out
+
+
+Public Sub Part2()
+ 
+ Dim InputQuery As String: InputQuery = Worksheets("Query").Range("A1").Value
+ Dim InputArray() As String
+ Dim InputNum As Integer: InputNum = 0
+ Dim IEnd As Integer
+ 
+ Dim QueryArray() As Variant 'as a 2 dimension array to store term and idf value from mDictionary later
+ Dim Querynum As Integer: Querynum = 0
+ ReDim QueryArray(1, 0) As Variant
+ Dim QEnd As Integer: QEnd = UBound(QueryArray, 2)
+
+ 'Refer the value in the worksheets into the new arrays : Postings and Dictionary in this new procedure--------------------------
+ 
+ Dim Postings() As Variant
+ Dim Dictionary() As Variant
+ 
+ ReDim Postings(2, 0) As Variant
+ ReDim Dictionary(1, 0) As Variant
+ 
+ Dim pLastRow As Integer, pLastCol As Integer
+ pLastRow = Worksheets("Postings").Range("A1").CurrentRegion.Rows.Count
+ 'Debug.Print pLastRow
+ pLastCol = Worksheets("Postings").Range("A1").CurrentRegion.Columns.Count
+ 'Debug.Print pLastCol
+ 
+ Dim a As Integer, b As Integer
+    For a = 0 To pLastRow
+        ReDim Preserve Postings(2, UBound(Postings, 2) + 1) As Variant
+        Postings(0, a) = Worksheets("Postings").Cells(a + 1, 1).Value
+        Postings(1, a) = Worksheets("Postings").Cells(a + 1, 2).Value
+        Postings(2, a) = Worksheets("Postings").Cells(a + 1, 3).Value
+    Next a
+ 
+' Debug.Print Postings(0, 600)
+ 'Debug.Print Postings(1, 600)
+ 'Debug.Print Postings(2, 600)
+ 
+ Dim dLastRow As Integer, dLastCol As Integer
+ dLastRow = Worksheets("Dictionary").Range("A1").CurrentRegion.Rows.Count
+ 'Debug.Print dLastRow
+ dLastCol = Worksheets("Dictionary").Range("A1").CurrentRegion.Columns.Count
+ 'Debug.Print dLastCol
+ 
+    For b = 0 To dLastRow
+        ReDim Preserve Dictionary(1, UBound(Dictionary, 2) + 1) As Variant
+        Dictionary(0, b) = Worksheets("Dictionary").Cells(b + 1, 1).Value
+        Dictionary(1, b) = Worksheets("Dictionary").Cells(b + 1, 2).Value
+    Next b
+ 
+' Debug.Print Dictionary(0, 0)
+ 'Debug.Print Dictionary(1, 32)
+
+'Check if query is an empty string--------------------------------------------------------
+ 
+If InputQuery = "" Then
+    MsgBox "Empty. Please input your query again."
+    Exit Sub
+End If
+
+  'Input Query is split into an array
+  
+InputArray = Split(InputQuery, " ")
+'Debug.Print InputArray(0)
+
+ 'ReDim Preserve QueryArray(1, 10) As Variant
+  For InputNum = 0 To UBound(InputArray)
+      InputArray(InputNum) = CleanUp(InputArray(InputNum))
+      'If Len(InputArray(InputNum)) < 1 Then
+      'End If
+      InputArray(InputNum) = UCase(InputArray(InputNum))
+      'QueryArray(0, InputNum) = InputArray(InputNum)
+  Next InputNum
+  'Debug.Print InputArray(0)
+  'Debug.Print InputArray(1)
+  'Debug.Print InputArray(2)
+  'Debug.Print QueryArray(0, 3)
+  
+ 
+ 'Put term values in InputArray into QueryArray(1st dimension)
+ 
+ 
+ 
+ For Querynum = 0 To UBound(InputArray)
+    If InputArray(Querynum) <> "" Then
+        ReDim Preserve QueryArray(1, UBound(QueryArray, 2) + 1) As Variant
+        QueryArray(0, Querynum) = InputArray(Querynum)
+        
+    End If
+    'QEnd = UBound(InputArray)
+ Next Querynum
+ 
+ 'Debug.Print QueryArray(0, 0)
+ 'Debug.Print QueryArray(0, 1)
+ 'Debug.Print QueryArray(0, 2)
+ 'Debug.Print QueryArray(0, 3)
+ 'Debug.Print QEnd
+
+ 
+'At the same time, compare the term value in Query Array with the term in Dictionary Array
+ Dim DictIndex As Integer, counter As Integer: counter = 0
+ For Querynum = 0 To UBound(QueryArray, 2)
+        Dim DictFound As Boolean: DictFound = False
+        For DictIndex = 0 To UBound(Dictionary, 2)
+            If QueryArray(0, Querynum) = Dictionary(0, DictIndex) Then
+                QueryArray(1, Querynum) = Dictionary(1, DictIndex)
+                'counter = counter + 1
+                DictFound = True
+                'Debug.Print counter
+                Exit For
+            End If
+        Next DictIndex
+        If DictFound = False Then
+             MsgBox "No match"
+             Exit Sub
+        End If
+        
+ Next Querynum
+ 
+Call Bubblesort_reverse(QueryArray)
+
+'Debug.Print QueryArray(0, 0)
+
+'Retrieve documents having first qTerm from postings
+
+Dim Accumulator() As Variant
+ReDim Accumulator(1, 0) As Variant
+Dim Anum As Integer: Anum = 0
+Dim AEnd As Integer: AEnd = UBound(Accumulator, 2)
+
 Dim PostIndex As Integer
-Dim PostFound As Boolean: PostFound = True
-For PostIndex = 0 To UBound(mPostings, 2)
-    If Token = mPostings(0, PostIndex) And Filename = mPostings(1, PostIndex) Then
-        PostFound = True
-        mPostings(2, PostIndex) = mPostings(2, PostIndex) + 1
-        Exit For
+
+For PostIndex = 0 To UBound(Postings, 2)
+    If QueryArray(0, 0) = Postings(0, PostIndex) Then
+        If Len(Accumulator(0, 0)) > 0 Then
+            ReDim Preserve Accumulator(1, UBound(Accumulator, 2) + 1) As Variant
+        
+        End If
+        
+        Accumulator(0, UBound(Accumulator, 2)) = Postings(1, PostIndex)
+        Accumulator(1, UBound(Accumulator, 2)) = Postings(2, PostIndex) * QueryArray(1, 0)
+
     End If
 Next
 
-If Not PostFound Then
+ 'Debug.Print Accumulator(0, 0)
+ 'Debug.Print Accumulator(1, 0)
+ 
+'Remaining qTerm
+For Querynum = 1 To UBound(QueryArray, 2) 'check from 2nd query term
+    For PostIndex = 0 To UBound(Postings, 2)
+        If QueryArray(0, Querynum) = Postings(0, PostIndex) Then  'if 2nd query term can be found in Postings
+            For Anum = 0 To UBound(Accumulator, 2)  'Then check if the documents related to 2nd query term also exist before (= included in the documents of 1st query term)
+               If Postings(1, PostIndex) = Accumulator(0, Anum) Then
+                    Accumulator(1, Anum) = Accumulator(1, Anum) + Postings(2, PostIndex) * QueryArray(1, Querynum) 'if yes, then add weighting: tf1-idf1 + tf2-idf2 (for each doc)...  if no, no need to add
+                    'Debug.Print Accumulator(1, Anum)
+               End If
+               
+            Next Anum
+        End If
+    Next PostIndex
+Next Querynum
+
+
+Call Bubblesort_reverse(Accumulator)
+
+
+'Print results.......
+
+For Anum = 0 To UBound(Accumulator, 2)
+    Worksheets("Query").Cells(Anum + 1, 2).Value = Accumulator(0, Anum)
+    Worksheets("Query").Cells(Anum + 1, 3).Value = Accumulator(1, Anum)
+Next Anum
+
+End Sub
+
+
+Public Sub Bubblesort_reverse(sortary As Variant)
+  Dim temp1 As String
+  Dim temp2 As String
+  Dim i As Long
+  Dim j As Long
+  Dim First As Long
+  Dim Last As Long
+  First = LBound(sortary, 2)
+  Last = UBound(sortary, 2)
+  
+  For i = First To Last - 1
+    For j = i + 1 To Last
+    
+      If sortary(1, i) > sortary(1, j) Then
+        temp1 = sortary(0, i)
+        temp2 = sortary(1, i)
+        
+        sortary(0, i) = sortary(0, j)
+        sortary(1, i) = sortary(1, j)
+        
+        sortary(0, j) = temp1
+        sortary(1, j) = temp2
+      End If
+    Next j
+  Next i
+
+End Sub
+
+
+Private Function CheckAccumulator(DocId As String)
+
+Dim Accumulator() As Variant
+CheckAccumulator = Null
+Dim i As Integer: i = 0
+Dim DocIdFound As Boolean: DocIdFound = False
+Do
+    If DocId = Accumulator(0, i) Then
+        DocIdFound = True
+    Else
+        i = i + 1
+    End If
+Loop While Not DocIdFound And i <= UBound(Accumulator, 2)
+ 
+If DocIdFound Then
+   CheckAccumulator = i
+End If
+
+End Function
+
+Public Sub Bubblesort_post(sortary As Variant)
+
+  Dim temp1 As String
+  Dim temp2 As String
+  Dim temp3 As String
+  Dim i As Long
+  Dim j As Long
+  Dim First As Long
+  Dim Last As Long
+  First = LBound(sortary, 2)
+  Last = UBound(sortary, 2)
+  
+  For i = First To Last - 1
+    For j = i + 1 To Last
+    
+    If sortary(1, i) > sortary(1, j) Then
+        temp1 = sortary(0, i)
+        temp2 = sortary(1, i)
+        temp3 = sortary(2, i)
+        
+        sortary(0, i) = sortary(0, j)
+        sortary(1, i) = sortary(1, j)
+        sortary(2, i) = sortary(2, j)
+        
+        sortary(0, j) = temp1
+        sortary(1, j) = temp2
+        sortary(2, j) = temp3
+        
+      End If
+    Next j
+  Next i
 
 End Sub
 
