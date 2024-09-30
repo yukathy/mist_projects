@@ -203,11 +203,6 @@ CleanUp = .Replace(text, "")
 End With
 End Function
 
-'Part 2
-'Please go to Worksheets("Query")
-'I am trying my best to finish part 2, but I do not have enough time to figure out
-
-
 Public Sub Part2()
  
  Dim InputQuery As String: InputQuery = Worksheets("Query").Range("A1").Value
@@ -220,7 +215,7 @@ Public Sub Part2()
  ReDim QueryArray(1, 0) As Variant
  Dim QEnd As Integer: QEnd = UBound(QueryArray, 2)
 
- 'Refer the value in the worksheets into the new arrays : Postings and Dictionary in this new procedure--------------------------
+ 'Refer the value in the worksheets into the new arrays : Postings and Dictionary 
  
  Dim Postings() As Variant
  Dim Dictionary() As Variant
@@ -261,7 +256,7 @@ Public Sub Part2()
 ' Debug.Print Dictionary(0, 0)
  'Debug.Print Dictionary(1, 32)
 
-'Check if query is an empty string--------------------------------------------------------
+'Check if query is an empty string
  
 If InputQuery = "" Then
     MsgBox "Empty. Please input your query again."
@@ -307,7 +302,7 @@ InputArray = Split(InputQuery, " ")
  'Debug.Print QEnd
 
  
-'At the same time, compare the term value in Query Array with the term in Dictionary Array
+'Compare the term value in Query Array with the term in Dictionary Array
  Dim DictIndex As Integer, counter As Integer: counter = 0
  For Querynum = 0 To UBound(QueryArray, 2)
         Dim DictFound As Boolean: DictFound = False
@@ -375,7 +370,7 @@ Next Querynum
 Call Bubblesort_reverse(Accumulator)
 
 
-'Print results.......
+'Print results
 
 For Anum = 0 To UBound(Accumulator, 2)
     Worksheets("Query").Cells(Anum + 1, 2).Value = Accumulator(0, Anum)
